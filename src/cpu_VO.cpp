@@ -11,6 +11,7 @@
 #include "std_msgs/MultiArrayDimension.h"
 #include "vonetvlad/my_image.h"
 #include "vonetvlad/my_data.h"
+#include "vonetvlad/Param.h"
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
@@ -42,13 +43,20 @@ void cpu_VO::cpuVOPub(const vonetvlad::my_data::ConstPtr& msg)
 {
     ROS_INFO("CPU VO heard: [%s]", msg->ID.c_str());
     int tmp;
+
+    ros::NodeHandle n;
+    ros::ServiceClient client1, client2;
+    client1 = n.serviceClient<vonetvlad::Param>("ParamManager");
+    vonetvlad::Param srv;
+    srv.request.name = "cpu_VO_begin";
     // Debug
     ROS_INFO("############# %f ##################", msg->data.at(10));
     
     // n.param<int>("running_cpu_VO",tmp,0);
-
+    // 修改参数
+    client1.call(srv);
     // doing computation
-    n.setParam("running_cpu_VO", 1);
+    // n.setParam("running_cpu_VO", 1);
     // starting time
     ros::Time start = ros::Time::now();
     usleep(10*1000);
@@ -59,7 +67,12 @@ void cpu_VO::cpuVOPub(const vonetvlad::my_data::ConstPtr& msg)
     ss << "  CPU VO result: " << "Not Completed";
     msg_pub.data = ss.str();
     cpu_vo_pub.publish(msg_pub);
-    n.setParam("running_cpu_VO", 0);
+    client2 = n.serviceClient<vonetvlad::Param>("ParamManager");
+    vonetvlad::Param srv2;
+    srv2.request.name = "cpu_VO_end";
+    // 修改参数
+    client2.call(srv2);
+    //n.setParam("running_cpu_VO", 0);
 
 }
 

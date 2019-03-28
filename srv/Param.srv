@@ -1,0 +1,8 @@
+string name
+uint8 size
+
+---
+uint8 cond
+uint8 running_dpu_VO
+uint8 depth_dpu_VO
+uint8 depth_cpu_NetVLAD

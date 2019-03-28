@@ -67,6 +67,11 @@ add_message_files(
   my_data.msg
 )
 
+add_service_files(
+  FILES
+  Param.srv
+)
+
 generate_messages(
   DEPENDENCIES
   std_msgs
@@ -156,6 +161,7 @@ add_executable(${PROJECT_NAME}_dpuVO src/dpu_VO.cpp)
 add_executable(${PROJECT_NAME}_cpuVO src/cpu_VO.cpp)
 add_executable(${PROJECT_NAME}_cpuNetVLAD src/cpu_NetVLAD.cpp)
 add_executable(${PROJECT_NAME}_dpuNetVLAD src/dpu_NetVLAD.cpp)
+add_executable(${PROJECT_NAME}_server src/server.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -170,7 +176,7 @@ add_dependencies(${PROJECT_NAME}_dpuVO ${${PROJECT_NAME}_EXPORTED_TARGETS} ${cat
 add_dependencies(${PROJECT_NAME}_cpuVO ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(${PROJECT_NAME}_cpuNetVLAD ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(${PROJECT_NAME}_dpuNetVLAD ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
+add_dependencies(${PROJECT_NAME}_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 ## add_dependencies(${PROJECT_NAME}_framegen ${PROJECT_NAME}_generate_messages_cpp)
 ## add_dependencies(${PROJECT_NAME}_dpuVO ${PROJECT_NAME}_generate_messages_cpp)
 ## add_dependencies(${PROJECT_NAME}_cpuVO ${PROJECT_NAME}_generate_messages_cpp)
@@ -191,6 +197,9 @@ target_link_libraries(${PROJECT_NAME}_cpuNetVLAD
 	${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
 )
 target_link_libraries(${PROJECT_NAME}_dpuNetVLAD
+	${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
+)
+target_link_libraries(${PROJECT_NAME}_server
 	${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
 )
 

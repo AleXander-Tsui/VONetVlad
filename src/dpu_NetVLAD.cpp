@@ -11,6 +11,7 @@
 #include "std_msgs/MultiArrayDimension.h"
 #include "vonetvlad/my_image.h"
 #include "vonetvlad/my_data.h"
+#include "vonetvlad/Param.h"
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
@@ -47,16 +48,30 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
     
     int tmp;    
     // n.param<int>("running_dpu_NetVLAD",tmp,0);
-
+    
     int running_dpu_VO;
     int depth_dpu_VO;
     int depth_cpu_NetVLAD;
+    ros::NodeHandle n;
+    ros::ServiceClient client1, client2, client3;
 
-    n.param<int>("running_dpu_VO", running_dpu_VO, 0);
-    n.param<int>("depth_dpu_VO", depth_dpu_VO, 0);
-    n.param<int>("depth_cpu_NetVLAD", depth_cpu_NetVLAD, 0);
+    client1 = n.serviceClient<vonetvlad::Param>("ParamManager");
+    vonetvlad::Param srv;
+    srv.request.name = "dpu_NetVLAD_init";
+    if (client1.call(srv))
+    {
+        running_dpu_VO = srv.response.running_dpu_VO;
+        depth_dpu_VO = srv.response.depth_dpu_VO;
+        depth_cpu_NetVLAD = srv.response.depth_cpu_NetVLAD;
+    }
+    else
+    {
+        ROS_INFO("Error!");
+        return;
+    }
+
     ROS_INFO_STREAM("depth_cpu_NetVLAD: " << depth_cpu_NetVLAD << "; depth_dpu_VO: " << depth_dpu_VO << "; running_dpu_VO: " << running_dpu_VO << "; recent_doing: " << recent_doing);
-       
+    
     if ( (running_dpu_VO > 0) ||  depth_dpu_VO > 1 || depth_cpu_NetVLAD > 1 || recent_doing>0){
         if( recent_doing){
             count_since_last += 1;
@@ -69,7 +84,12 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
     else{
         recent_doing = 1;
         count_since_last = 0;
-        n.setParam("running_dpu_NetVLAD", 1);
+        client2 = n.serviceClient<vonetvlad::Param>("ParamManager");
+        vonetvlad::Param srv2;
+        srv2.request.name = "dpu_NetVLAD_begin";
+        // 修改参数
+        client2.call(srv2);
+        // n.setParam("running_dpu_NetVLAD", 1);
         ROS_INFO("DPU NetVLAD heard: [%s]", msg->ID.c_str());
         // Debug
         ROS_INFO("############# %d ##################", msg->data.at(10));
@@ -111,7 +131,12 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
         ss << " DPU NetVLAD result: " << msg->data.c_str();
         msg_pub.data = ss.str();*/
         dpu_netvald_pub.publish(dat);
-        n.setParam("running_dpu_NetVLAD", 0);
+        client3 = n.serviceClient<vonetvlad::Param>("ParamManager");
+        vonetvlad::Param srv3;
+        srv3.request.name = "dpu_NetVLAD_end";
+        // 修改参数
+        client3.call(srv3);
+        // n.setParam("running_dpu_NetVLAD", 0);
     }
 }
 

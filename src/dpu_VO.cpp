@@ -11,6 +11,7 @@
 #include "std_msgs/MultiArrayDimension.h"
 #include "vonetvlad/my_image.h"
 #include "vonetvlad/my_data.h"
+#include "vonetvlad/Param.h"
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
@@ -56,18 +57,82 @@ void dpu_VO::callbackThread(void* __this)
   ros::Rate loop_rate2(50);
   // 发布DPU计算后的结果消息
   ros::Publisher dpu_vo_pub = n.advertise<vonetvlad::my_data>("dpu_VO", 3);
-  int running_dpu_NetVLAD;
+  /*int running_dpu_NetVLAD;
   int running_cpu_NetVLAD;
-  int depth_cpu_NetVLAD;
+  int depth_cpu_NetVLAD;*/
     // n.param<int>("running_dpu_VO",tmp,0);
     // n.param<int>("depth_dpu_VO",tmp,0);
-
+  ros::ServiceClient client1;
+  ros::ServiceClient client2;
   while (n.ok())
   {
-    n.param<int>("running_dpu_NetVLAD", running_dpu_NetVLAD, 0);
+    /*n.param<int>("running_dpu_NetVLAD", running_dpu_NetVLAD, 0);
     n.param<int>("running_cpu_NetVLAD", running_cpu_NetVLAD, 0);
-    n.param<int>("depth_cpu_NetVLAD",depth_cpu_NetVLAD,0);
-    if ( (! _this->frame_queue.empty())){
+    n.param<int>("depth_cpu_NetVLAD",depth_cpu_NetVLAD,0);*/
+
+    client1 = n.serviceClient<vonetvlad::Param>("ParamManager");
+    vonetvlad::Param srv;
+    srv.request.name = "dpu_VO_begin";
+    srv.request.size = _this->frame_queue.size();
+    if (client1.call(srv))
+    {
+        if (srv.response.cond == 0)
+        {
+            ROS_INFO_STREAM("Queue empty");
+            loop_rate2.sleep();
+        }
+        if (srv.response.cond == 1)
+        {
+            ROS_INFO_STREAM("Queue depth: " << _this->frame_queue.size() << "; WORD: " << _this->frame_queue.front()->ID.c_str() );
+            // starting time
+            ros::Time start = ros::Time::now();
+            // doing computation
+            usleep(3*1000);
+            // finishing time
+            ROS_INFO_STREAM("image ID: " << _this->frame_queue.front()->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
+
+            // 将计算结果转换为自定义消息"my_data"发布
+            // 定义自定义消息
+            vonetvlad::my_data dat;
+            std::stringstream ss;
+            ss << _this->frame_queue.front()->ID;
+            dat.ID = ss.str();
+            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+            dat.layout.dim[0].label = "height";
+            dat.layout.dim[1].label = "width";
+            dat.layout.dim[2].label = "channal";
+            dat.layout.dim[0].size = rH;
+            dat.layout.dim[1].size = rW;
+            dat.layout.dim[2].size = rC;
+            dat.layout.dim[0].stride = rH*rW*rC;
+            dat.layout.dim[1].stride = rW*rC;
+            dat.layout.dim[2].stride = rC;
+            dat.layout.data_offset = 0;
+            std::vector<float> vec2(rW*rH*rC, 0);
+            for (int i=0; i<rH; i++)
+                for (int j=0; j<rW; j++)
+                    for (int z=0; z<rC; z++)
+                        vec2[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
+            dat.data = vec2;
+            dpu_vo_pub.publish(dat);
+            ros::spinOnce();
+            _this->frame_queue.pop();
+            // Try
+            client2 = n.serviceClient<vonetvlad::Param>("ParamManager");
+            vonetvlad::Param srv2;
+            srv2.request.name = "dpu_VO_end";
+            srv2.request.size = _this->frame_queue.size();
+            client2.call(srv2);
+            ROS_INFO("#############################################");
+        }
+        if (srv.response.cond == 2)
+        {
+            loop_rate2.sleep();
+        }
+    }
+    /*if ( (! _this->frame_queue.empty())){
         ROS_INFO_STREAM("running_dpu_NetVLAD: " << running_dpu_NetVLAD << "; depth_cpu_NetVLAD: " << depth_cpu_NetVLAD << "; running_cpu_NetVLAD: " << running_cpu_NetVLAD);
         if ( (! running_dpu_NetVLAD) && ( (depth_cpu_NetVLAD <= 1 && running_cpu_NetVLAD) || (depth_cpu_NetVLAD < 1 && ! running_cpu_NetVLAD) ) ){
             n.setParam("running_dpu_VO", 1);
@@ -111,12 +176,6 @@ void dpu_VO::callbackThread(void* __this)
                     for (int z=0; z<rC; z++)
                         vec2[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
             dat.data = vec2;
-            /*
-            std::stringstream ss;
-            std_msgs::String msg;
-            ss << "DPU VO result: [%s]" << _this->frame_queue.front()->ID;
-            msg.data = ss.str();
-            */
             dpu_vo_pub.publish(dat);
             ros::spinOnce();
             _this->frame_queue.pop();
@@ -136,6 +195,7 @@ void dpu_VO::callbackThread(void* __this)
         ROS_INFO_STREAM("Queue empty");
         loop_rate2.sleep();
     }
+  }*/
   }
 }
 

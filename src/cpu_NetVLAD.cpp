@@ -11,6 +11,7 @@
 #include "std_msgs/MultiArrayDimension.h"
 #include "vonetvlad/my_image.h"
 #include "vonetvlad/my_data.h"
+#include "vonetvlad/Param.h"
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
@@ -56,10 +57,18 @@ void cpu_NetVLAD::cpuNetVLADPub(void* __this)
     int tmp;
     // n.param<int>("running_cpu_NetVLAD",tmp,0);
     // n.param<int>("depth_cpu_NetVLAD",tmp,0);
+    ros::ServiceClient client1, client2, client3;
     while (n.ok()){
         if ( (! _this->dpu_netvlad_queue.empty() ) ){
+            client1 = n.serviceClient<vonetvlad::Param>("ParamManager");
+            vonetvlad::Param srv1;
+            srv1.request.name = "cpu_NetVLAD_begin";
+            srv1.request.size = int(_this->dpu_netvlad_queue.size() );
+            // 修改参数
+            client1.call(srv1);
+            /*
             n.setParam("running_cpu_NetVLAD", 1);
-            n.setParam("depth_cpu_NetVLAD", int(_this->dpu_netvlad_queue.size() ) );
+            n.setParam("depth_cpu_NetVLAD", int(_this->dpu_netvlad_queue.size() ) );*/
             ROS_INFO("CPU NetVLAD heard: [%s]", _this->dpu_netvlad_queue.front()->ID.c_str() );
             // Debug
             ROS_INFO("############# %f ##################", _this->dpu_netvlad_queue.front()->data.at(10));
@@ -77,13 +86,23 @@ void cpu_NetVLAD::cpuNetVLADPub(void* __this)
             cpu_netvlad_pub.publish(msg_pub);
             ros::spinOnce();
             _this->dpu_netvlad_queue.pop();
-            
-            n.setParam("running_cpu_NetVLAD", 0);
-            n.setParam("depth_cpu_NetVLAD", int(_this->dpu_netvlad_queue.size() ) );
+            client2 = n.serviceClient<vonetvlad::Param>("ParamManager");
+            vonetvlad::Param srv2;
+            srv2.request.name = "cpu_NetVLAD_end";
+            srv2.request.size = int(_this->dpu_netvlad_queue.size() );
+            // 修改参数
+            client2.call(srv2);
+            /*n.setParam("running_cpu_NetVLAD", 0);
+            n.setParam("depth_cpu_NetVLAD", int(_this->dpu_netvlad_queue.size() ) );*/
         }
         else{
-            n.setParam("running_cpu_NetVLAD", 0);  
-            n.setParam("depth_cpu_NetVLAD", 0);           
+            client3 = n.serviceClient<vonetvlad::Param>("ParamManager");
+            vonetvlad::Param srv3;
+            srv3.request.name = "cpu_NetVLAD_freeze";
+            // 修改参数
+            client3.call(srv3);
+            /*n.setParam("running_cpu_NetVLAD", 0);  
+            n.setParam("depth_cpu_NetVLAD", 0);*/           
             ROS_INFO_STREAM("Queue empty");
             loop_rate2.sleep();
         }
