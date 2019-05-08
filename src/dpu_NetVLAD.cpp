@@ -75,7 +75,7 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
     if ( (running_dpu_VO > 0) ||  depth_dpu_VO > 1 || depth_cpu_NetVLAD > 1 || recent_doing>0){
         if( recent_doing){
             count_since_last += 1;
-            if ( depth_cpu_NetVLAD ==0 || count_since_last > 5){
+            if ( depth_cpu_NetVLAD ==0 || count_since_last > 6){
                 recent_doing = 0;
             }
         }
@@ -90,47 +90,53 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
         // 修改参数
         client2.call(srv2);
         // n.setParam("running_dpu_NetVLAD", 1);
-        ROS_INFO("DPU NetVLAD heard: [%s]", msg->ID.c_str());
-        // Debug
-        ROS_INFO("############# %d ##################", msg->data.at(10));
+        if (srv2.response.running_dpu_VO == 1)
+        {
+            ROS_INFO("Time lines overlape.");
+        }
+        else{
+            ROS_INFO("DPU NetVLAD heard: [%s]", msg->ID.c_str());
+            // Debug
+            ROS_INFO("############# %d ##################", msg->data.at(10));
 
-        // starting time
-        ros::Time start = ros::Time::now();
-        // doing computation
-        usleep(66*1000);
-        // finishing time
-        ROS_INFO_STREAM("image ID: " << msg->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
-        
-        // 将计算结果转换为自定义消息"my_data"发布
-        // 定义自定义消息
-        vonetvlad::my_data dat;
-        std::stringstream ss;
-        ss << msg->ID;
-        dat.ID = ss.str();
-        dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        dat.layout.dim[0].label = "height";
-        dat.layout.dim[1].label = "width";
-        dat.layout.dim[2].label = "channal";
-        dat.layout.dim[0].size = rH;
-        dat.layout.dim[1].size = rW;
-        dat.layout.dim[2].size = rC;
-        dat.layout.dim[0].stride = rH*rW*rC;
-        dat.layout.dim[1].stride = rW*rC;
-        dat.layout.dim[2].stride = rC;
-        dat.layout.data_offset = 0;
-        std::vector<float> vec(rW*rH*rC, 0);
-        for (int i=0; i<rH; i++)
-            for (int j=0; j<rW; j++)
-                for (int z=0; z<rC; z++)
-                    vec[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
-        dat.data = vec;
-        /*std::stringstream ss;
-        std_msgs::String msg_pub;
-        ss << " DPU NetVLAD result: " << msg->data.c_str();
-        msg_pub.data = ss.str();*/
-        dpu_netvald_pub.publish(dat);
+            // starting time
+            ros::Time start = ros::Time::now();
+            // doing computation
+            usleep(66*1000);
+            // finishing time
+            ROS_INFO_STREAM("image ID: " << msg->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
+            
+            // 将计算结果转换为自定义消息"my_data"发布
+            // 定义自定义消息
+            vonetvlad::my_data dat;
+            std::stringstream ss;
+            ss << msg->ID;
+            dat.ID = ss.str();
+            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+            dat.layout.dim[0].label = "height";
+            dat.layout.dim[1].label = "width";
+            dat.layout.dim[2].label = "channal";
+            dat.layout.dim[0].size = rH;
+            dat.layout.dim[1].size = rW;
+            dat.layout.dim[2].size = rC;
+            dat.layout.dim[0].stride = rH*rW*rC;
+            dat.layout.dim[1].stride = rW*rC;
+            dat.layout.dim[2].stride = rC;
+            dat.layout.data_offset = 0;
+            std::vector<float> vec(rW*rH*rC, 0);
+            for (int i=0; i<rH; i++)
+                for (int j=0; j<rW; j++)
+                    for (int z=0; z<rC; z++)
+                        vec[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
+            dat.data = vec;
+            /*std::stringstream ss;
+            std_msgs::String msg_pub;
+            ss << " DPU NetVLAD result: " << msg->data.c_str();
+            msg_pub.data = ss.str();*/
+            dpu_netvald_pub.publish(dat);
+        }
         client3 = n.serviceClient<vonetvlad::Param>("ParamManager");
         vonetvlad::Param srv3;
         srv3.request.name = "dpu_NetVLAD_end";

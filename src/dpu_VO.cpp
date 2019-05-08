@@ -124,6 +124,7 @@ void dpu_VO::callbackThread(void* __this)
             vonetvlad::Param srv2;
             srv2.request.name = "dpu_VO_end";
             srv2.request.size = _this->frame_queue.size();
+	    //ROS_INFO("####");
             client2.call(srv2);
             ROS_INFO("#############################################");
         }
