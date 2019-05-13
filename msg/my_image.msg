@@ -1,3 +1,2 @@
 string ID
-std_msgs/MultiArrayLayout layout 
-uint8[] data
+sensor_msgs/Image frame

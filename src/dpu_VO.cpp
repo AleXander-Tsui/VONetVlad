@@ -17,6 +17,11 @@
 #include <vector>
 #include <array>
 
+#include <image_transport/image_transport.h>  
+#include <opencv2/highgui/highgui.hpp>  
+#include <opencv2/imgproc/imgproc.hpp>  
+#include <cv_bridge/cv_bridge.h> 
+
 #define H (240)
 #define W (640)
 #define C (3)
@@ -91,6 +96,9 @@ void dpu_VO::callbackThread(void* __this)
             // finishing time
             ROS_INFO_STREAM("image ID: " << _this->frame_queue.front()->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
 
+            // test opencv image
+            cv::Mat cv_frame = cv_bridge::toCvCopy( _this->frame_queue.front()->frame, "bgr8")->image;
+            ROS_INFO_STREAM(cv_frame.cols << ' ' << cv_frame.rows << ' ' << int(cv_frame.ptr<uchar>(100)[100*3]) << ' ' << int(cv_frame.ptr<uchar>(200)[400*3]));
             // 将计算结果转换为自定义消息"my_data"发布
             // 定义自定义消息
             vonetvlad::my_data dat;

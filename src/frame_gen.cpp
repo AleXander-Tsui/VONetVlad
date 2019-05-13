@@ -6,12 +6,18 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 #include "std_msgs/MultiArrayDimension.h"
+#include "sensor_msgs/Image.h"
 #include "vonetvlad/my_image.h"
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
 #include <array>
 #include <time.h>
+
+#include <image_transport/image_transport.h>  
+#include <opencv2/highgui/highgui.hpp>  
+#include <opencv2/imgproc/imgproc.hpp>  
+#include <cv_bridge/cv_bridge.h> 
 
 #define H (240)
 #define W (640)
@@ -34,35 +40,22 @@ int main(int argc, char **argv)
     int count = 0;
     while (ros::ok())
     {   
-        // 定义自定义消息
-        vonetvlad::my_image dat;
+        std::string image = "/home/linaro/DepthVO/images/0000001101.png";
+        cv::Mat cv_frame = cv::imread(image);
+        // test opencv image
+        ROS_INFO_STREAM(cv_frame.cols << ' ' << cv_frame.rows << ' ' << int(cv_frame.ptr<uchar>(100)[100*3]) << ' ' << int(cv_frame.ptr<uchar>(200)[400*3]));
+        vonetvlad::my_image imsg;
+        sensor_msgs::Image::Ptr ros_frame;
+        std_msgs::Header head;
+        ros_frame = cv_bridge::CvImage(head, "bgr8", cv_frame).toImageMsg();
+        imsg.frame = *ros_frame;
         std::stringstream ss;
         ss << count;
-        dat.ID = ss.str();
-        dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-        dat.layout.dim[0].label = "height";
-        dat.layout.dim[1].label = "width";
-        dat.layout.dim[2].label = "channal";
-        dat.layout.dim[0].size = H;
-        dat.layout.dim[1].size = W;
-        dat.layout.dim[2].size = C;
-        dat.layout.dim[0].stride = H*W*C;
-        dat.layout.dim[1].stride = W*C;
-        dat.layout.dim[2].stride = C;
-        dat.layout.data_offset = 0;
-        std::vector<uint8_t> vec(W*H*C, 0);
-
-        for (int i=0; i<H; i++)
-            for (int j=0; j<W; j++)
-                for (int z=0; z<C; z++)
-                    vec[i*W*C + j*C + z] = rand() % 10 + 1 ;
-        dat.data = vec;
+        imsg.ID = ss.str();
 
         // 发布消息
-        ROS_INFO_STREAM("Image ID: " << dat.ID.c_str());
-        chatter_pub.publish(dat);
+        ROS_INFO_STREAM("Image ID: " << imsg.ID.c_str());
+        chatter_pub.publish(imsg);
 
         // 循环等待回调函数
         ros::spinOnce();

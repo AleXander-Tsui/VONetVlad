@@ -97,7 +97,7 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
         else{
             ROS_INFO("DPU NetVLAD heard: [%s]", msg->ID.c_str());
             // Debug
-            ROS_INFO("############# %d ##################", msg->data.at(10));
+            // ROS_INFO("############# %d ##################", msg->data.at(10));
 
             // starting time
             ros::Time start = ros::Time::now();
