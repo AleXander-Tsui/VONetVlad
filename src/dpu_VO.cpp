@@ -7,6 +7,7 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 #include <thread>
+#include <string.h>
 #include <unistd.h>
 #include "std_msgs/MultiArrayDimension.h"
 #include "vonetvlad/my_image.h"
@@ -28,6 +29,9 @@
 #define rH (14)
 #define rW (14)
 #define rC (512)
+
+cv::Mat pre_frame;
+std::string pre_ID = "0";
 
 class dpu_VO{
 public:
@@ -88,123 +92,82 @@ void dpu_VO::callbackThread(void* __this)
         }
         if (srv.response.cond == 1)
         {
-            ROS_INFO_STREAM("Queue depth: " << _this->frame_queue.size() << "; WORD: " << _this->frame_queue.front()->ID.c_str() );
-            // starting time
-            ros::Time start = ros::Time::now();
-            // doing computation
-            usleep(3*1000);
-            // finishing time
-            ROS_INFO_STREAM("image ID: " << _this->frame_queue.front()->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
+            if (strcmp(pre_ID.c_str(), "0") == 0)
+            {
+                ROS_INFO("**************First frame****************");
+                ROS_INFO_STREAM("Queue depth: " << _this->frame_queue.size() << "; WORD: " << _this->frame_queue.front()->ID.c_str() );
+                pre_ID = _this->frame_queue.front()->ID.c_str();
+                pre_frame = cv_bridge::toCvCopy( _this->frame_queue.front()->frame, "bgr8")->image;
+                ROS_INFO_STREAM(pre_frame.cols << ' ' << pre_frame.rows << ' ' << int(pre_frame.ptr<uchar>(100)[100*3]) << ' ' << int(pre_frame.ptr<uchar>(200)[400*3]));
+                _this->frame_queue.pop();
+                client2 = n.serviceClient<vonetvlad::Param>("ParamManager");
+                vonetvlad::Param srv2;
+                srv2.request.name = "dpu_VO_end";
+                srv2.request.size = _this->frame_queue.size();
+                //ROS_INFO("####");
+                client2.call(srv2);
+                ROS_INFO("#############################################");
+            }
+            else{
+                ROS_INFO_STREAM("Queue depth: " << _this->frame_queue.size() << "; WORD: " << _this->frame_queue.front()->ID.c_str() );
+                // starting time
+                ros::Time start = ros::Time::now();
+                // doing computation
+                usleep(3*1000);
+                // finishing time
+                ROS_INFO_STREAM("previous image ID: " << pre_ID);
+                ROS_INFO_STREAM("image ID: " << _this->frame_queue.front()->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
 
-            // test opencv image
-            cv::Mat cv_frame = cv_bridge::toCvCopy( _this->frame_queue.front()->frame, "bgr8")->image;
-            ROS_INFO_STREAM(cv_frame.cols << ' ' << cv_frame.rows << ' ' << int(cv_frame.ptr<uchar>(100)[100*3]) << ' ' << int(cv_frame.ptr<uchar>(200)[400*3]));
-            // 将计算结果转换为自定义消息"my_data"发布
-            // 定义自定义消息
-            vonetvlad::my_data dat;
-            std::stringstream ss;
-            ss << _this->frame_queue.front()->ID;
-            dat.ID = ss.str();
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim[0].label = "height";
-            dat.layout.dim[1].label = "width";
-            dat.layout.dim[2].label = "channal";
-            dat.layout.dim[0].size = rH;
-            dat.layout.dim[1].size = rW;
-            dat.layout.dim[2].size = rC;
-            dat.layout.dim[0].stride = rH*rW*rC;
-            dat.layout.dim[1].stride = rW*rC;
-            dat.layout.dim[2].stride = rC;
-            dat.layout.data_offset = 0;
-            std::vector<float> vec2(rW*rH*rC, 0);
-            for (int i=0; i<rH; i++)
-                for (int j=0; j<rW; j++)
-                    for (int z=0; z<rC; z++)
-                        vec2[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
-            dat.data = vec2;
-            dpu_vo_pub.publish(dat);
-            ros::spinOnce();
-            _this->frame_queue.pop();
-            // Try
-            client2 = n.serviceClient<vonetvlad::Param>("ParamManager");
-            vonetvlad::Param srv2;
-            srv2.request.name = "dpu_VO_end";
-            srv2.request.size = _this->frame_queue.size();
-	    //ROS_INFO("####");
-            client2.call(srv2);
-            ROS_INFO("#############################################");
+                // test opencv image
+                cv::Mat cv_frame = cv_bridge::toCvCopy( _this->frame_queue.front()->frame, "bgr8")->image;
+                ROS_INFO_STREAM(cv_frame.cols << ' ' << cv_frame.rows << ' ' << int(cv_frame.ptr<uchar>(100)[100*3]) << ' ' << int(cv_frame.ptr<uchar>(200)[400*3]));
+                // 将计算结果转换为自定义消息"my_data"发布
+                // 定义自定义消息
+                vonetvlad::my_data dat;
+                std::stringstream ss;
+                ss << _this->frame_queue.front()->ID;
+                dat.ID = ss.str();
+                dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+                dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+                dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
+                dat.layout.dim[0].label = "height";
+                dat.layout.dim[1].label = "width";
+                dat.layout.dim[2].label = "channal";
+                dat.layout.dim[0].size = rH;
+                dat.layout.dim[1].size = rW;
+                dat.layout.dim[2].size = rC;
+                dat.layout.dim[0].stride = rH*rW*rC;
+                dat.layout.dim[1].stride = rW*rC;
+                dat.layout.dim[2].stride = rC;
+                dat.layout.data_offset = 0;
+                std::vector<float> vec2(rW*rH*rC, 0);
+                for (int i=0; i<rH; i++)
+                    for (int j=0; j<rW; j++)
+                        for (int z=0; z<rC; z++)
+                            vec2[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
+                dat.data = vec2;
+                dpu_vo_pub.publish(dat);
+                ros::spinOnce();
+                // change pre_frame
+                pre_ID = _this->frame_queue.front()->ID.c_str();
+                pre_frame = cv_bridge::toCvCopy( _this->frame_queue.front()->frame, "bgr8")->image;
+                
+                _this->frame_queue.pop();
+                // Try
+                client2 = n.serviceClient<vonetvlad::Param>("ParamManager");
+                vonetvlad::Param srv2;
+                srv2.request.name = "dpu_VO_end";
+                srv2.request.size = _this->frame_queue.size();
+                //ROS_INFO("####");
+                client2.call(srv2);
+                ROS_INFO("#############################################");
+            }
         }
         if (srv.response.cond == 2)
         {
             loop_rate2.sleep();
         }
     }
-    /*if ( (! _this->frame_queue.empty())){
-        ROS_INFO_STREAM("running_dpu_NetVLAD: " << running_dpu_NetVLAD << "; depth_cpu_NetVLAD: " << depth_cpu_NetVLAD << "; running_cpu_NetVLAD: " << running_cpu_NetVLAD);
-        if ( (! running_dpu_NetVLAD) && ( (depth_cpu_NetVLAD <= 1 && running_cpu_NetVLAD) || (depth_cpu_NetVLAD < 1 && ! running_cpu_NetVLAD) ) ){
-            n.setParam("running_dpu_VO", 1);
-            n.setParam("depth_dpu_VO", int(_this->frame_queue.size() ) );
-            ROS_INFO_STREAM("Queue depth: " << _this->frame_queue.size() << "; WORD: " << _this->frame_queue.front()->ID.c_str() );
-
-            // Debug: check msg
-            // 将消息转换为计算输入
-            // std::vector<uint8_t> vec1(H*W*C, 0);
-            // vec1 = _this->frame_queue.front()->data;
-            ROS_INFO("############# %d ##################", _this->frame_queue.front()->data.at(10));
-            // starting time
-            ros::Time start = ros::Time::now();
-            // doing computation
-            usleep(3*1000);
-            // finishing time
-            ROS_INFO_STREAM("image ID: " << _this->frame_queue.front()->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
-
-            // 将计算结果转换为自定义消息"my_data"发布
-            // 定义自定义消息
-            vonetvlad::my_data dat;
-            std::stringstream ss;
-            ss << _this->frame_queue.front()->ID;
-            dat.ID = ss.str();
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim[0].label = "height";
-            dat.layout.dim[1].label = "width";
-            dat.layout.dim[2].label = "channal";
-            dat.layout.dim[0].size = rH;
-            dat.layout.dim[1].size = rW;
-            dat.layout.dim[2].size = rC;
-            dat.layout.dim[0].stride = rH*rW*rC;
-            dat.layout.dim[1].stride = rW*rC;
-            dat.layout.dim[2].stride = rC;
-            dat.layout.data_offset = 0;
-            std::vector<float> vec2(rW*rH*rC, 0);
-            for (int i=0; i<rH; i++)
-                for (int j=0; j<rW; j++)
-                    for (int z=0; z<rC; z++)
-                        vec2[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
-            dat.data = vec2;
-            dpu_vo_pub.publish(dat);
-            ros::spinOnce();
-            _this->frame_queue.pop();
-            n.setParam("running_dpu_VO", 0);
-            n.setParam("depth_dpu_VO", int(_this->frame_queue.size() ) );
-            // loop_rate2.sleep();
-        }
-        else{
-            ROS_INFO_STREAM("Queue not empty, but not start");
-            n.setParam("depth_dpu_VO", int(_this->frame_queue.size() ) );
-            loop_rate2.sleep();
-        }
-    }
-    else {
-        n.setParam("running_dpu_VO", 0);
-        n.setParam("depth_dpu_VO", 0 );
-        ROS_INFO_STREAM("Queue empty");
-        loop_rate2.sleep();
-    }
-  }*/
   }
 }
 
