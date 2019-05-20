@@ -23,6 +23,8 @@
 #include <opencv2/imgproc/imgproc.hpp>  
 #include <cv_bridge/cv_bridge.h> 
 
+#include <dnndk/dnndk.h>
+
 #define H (240)
 #define W (640)
 #define C (3)
@@ -32,6 +34,9 @@
 
 cv::Mat pre_frame;
 std::string pre_ID = "0";
+
+
+float* dpuVO(cv::Mat image1, cv::Mat image2);
 
 class dpu_VO{
 public:
@@ -110,10 +115,12 @@ void dpu_VO::callbackThread(void* __this)
             }
             else{
                 ROS_INFO_STREAM("Queue depth: " << _this->frame_queue.size() << "; WORD: " << _this->frame_queue.front()->ID.c_str() );
+                cv::Mat now_frame = cv_bridge::toCvCopy( _this->frame_queue.front()->frame, "bgr8")->image;
                 // starting time
                 ros::Time start = ros::Time::now();
                 // doing computation
-                usleep(3*1000);
+                // usleep(3*1000);
+                dpuVO(pre_frame, now_frame);
                 // finishing time
                 ROS_INFO_STREAM("previous image ID: " << pre_ID);
                 ROS_INFO_STREAM("image ID: " << _this->frame_queue.front()->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
@@ -175,6 +182,8 @@ int main(int argc, char **argv)
 {
     // ROS节点初始化
     ros::init(argc, argv, "dpu_VO");
+    // 开启DPU
+    dpuOpen();
     dpu_VO dpu_VO_inst;
     ros::Rate loop_rate(50);
     dpu_VO_inst.startdputhread();
@@ -184,5 +193,6 @@ int main(int argc, char **argv)
         loop_rate.sleep();
     }
     dpu_VO_inst.dpu_thread.join();
+    dpuClose();
     return 0;
 }

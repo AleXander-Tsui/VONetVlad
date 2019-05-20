@@ -158,8 +158,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_framegen src/frame_gen.cpp)
-add_executable(${PROJECT_NAME}_dpuVO src/dpu_VO.cpp)
+add_executable(${PROJECT_NAME}_framegen src/frame_gen.cpp src/cal.cpp)
+add_executable(${PROJECT_NAME}_dpuVO src/dpu_VO.cpp src/cal.cpp)
 add_executable(${PROJECT_NAME}_cpuVO src/cpu_VO.cpp)
 add_executable(${PROJECT_NAME}_cpuNetVLAD src/cpu_NetVLAD.cpp)
 add_executable(${PROJECT_NAME}_dpuNetVLAD src/dpu_NetVLAD.cpp)
@@ -186,12 +186,22 @@ add_dependencies(${PROJECT_NAME}_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${ca
 ## add_dependencies(${PROJECT_NAME}_dpuNetVLAD ${PROJECT_NAME}_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
+target_link_libraries(${PROJECT_NAME}_framegen pthread hineon n2cube dputils)
 target_link_libraries(${PROJECT_NAME}_framegen
 	${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
 )
+file(GLOB_RECURSE DPU_CODES_VO model/dpu_deployVO.elf)
+target_link_libraries(${PROJECT_NAME}_framegen ${DPU_CODES_VO})
+
+
+target_link_libraries(${PROJECT_NAME}_dpuVO pthread hineon n2cube dputils)
 target_link_libraries(${PROJECT_NAME}_dpuVO
 	${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
 )
+
+# file(GLOB_RECURSE DPU_CODES_VO model/dpu_deployVO.elf)
+target_link_libraries(${PROJECT_NAME}_dpuVO ${DPU_CODES_VO})
+
 target_link_libraries(${PROJECT_NAME}_cpuVO
 	${catkin_LIBRARIES} ${OpenCV_LIBRARIES}
 )
