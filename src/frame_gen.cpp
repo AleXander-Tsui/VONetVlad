@@ -43,7 +43,7 @@ int main(int argc, char **argv)
     int count = 0;
     while (ros::ok())
     {   
-        std::string image = "/home/linaro/xuyf/catkin_ws/src/vonetvlad/images/0000001101.png";
+        std::string image = "/home/linaro/xuyf/catkin_ws/src/vonetvlad/images/0000001102.png";
         cv::Mat cv_frame = cv::imread(image);
         // test opencv image
         ROS_INFO_STREAM(cv_frame.cols << ' ' << cv_frame.rows << ' ' << int(cv_frame.ptr<uchar>(100)[100*3]) << ' ' << int(cv_frame.ptr<uchar>(200)[400*3]));

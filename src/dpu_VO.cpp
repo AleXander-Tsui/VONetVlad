@@ -28,15 +28,119 @@
 #define H (240)
 #define W (640)
 #define C (3)
-#define rH (14)
-#define rW (14)
-#define rC (512)
+#define rH (3)
+#define rW (10)
+#define rC (256)
+#define INPUT_NODE "conv_0_pose"
+#define OUTPUT_NODE "conv_5_pose"
+#define length 4096
 
+using namespace cv;
+using namespace std;
 cv::Mat pre_frame;
 std::string pre_ID = "0";
 
+void out_file(DPUTask* task) {
+    int num = dpuGetOutputTensorSize(task, OUTPUT_NODE);
+    float* result = new float[num];
+    dpuGetOutputTensorInHWCFP32(task, OUTPUT_NODE, result, num);
+    //result = dpuGetOutputTensorAddress(task, OUTPUT_NODE);
+    ofstream outfile("result_HWC.txt", ios::out);
+    if(!outfile) {
+            cerr<<"open outfile erro"<<endl;
+            exit(1);
+    }
+    for(int i=0; i<num; i++) {
+            outfile<<result[i]<<" ";
+    }
+    outfile.close();
 
-float* dpuVO(cv::Mat image1, cv::Mat image2);
+    dpuGetOutputTensorInCHWFP32(task, OUTPUT_NODE, result, num);
+    //result = dpuGetOutputTensorAddress(task, OUTPUT_NODE);
+    ofstream outfile1("result_CHW.txt", ios::out);
+    if(!outfile1) {
+            cerr<<"open outfile erro"<<endl;
+            exit(1);
+    }
+    for(int i=0; i<num; i++) {
+            outfile1<<result[i]<<" ";
+    }
+    outfile1.close();
+    delete[] result;
+}
+
+float* dpuVO(Mat image1, Mat image2) {
+    // Attach to DPU driver and prepare for running
+    // Load DPU Kernel for DenseBox neural network
+    ROS_INFO("ready to open kernel");
+    DPUKernel *kernel = dpuLoadKernel("deployVO");
+    ROS_INFO("complete open kernel");
+    assert(kernel);
+    DPUTask *task = dpuCreateTask(kernel, 0);
+    // device_setup(kernel, task);
+	DPUTensor* Result;
+	resize(image1, image1, Size(608,160), (0, 0), (0, 0), INTER_LINEAR);
+    resize(image2, image2, Size(608,160), (0, 0), (0, 0), INTER_LINEAR);
+	// mean
+    // cout << float(image1.at<Vec3b>(0, 0)[0]) << endl;
+    // cout << float(image2.at<Vec3b>(0, 0)[0]) << endl;
+	/*for (int row = 0; row < height; row++) 
+    {
+		for (int col = 0; col < width; col++) 
+        {
+            int b = image.at<Vec3b>(row, col)[0];
+            int g = image.at<Vec3b>(row, col)[1];
+            int r = image.at<Vec3b>(row, col)[2];
+            image.at<Vec3b>(row, col)[0] = b - 104;
+            image.at<Vec3b>(row, col)[1] = g - 117;
+            image.at<Vec3b>(row, col)[2] = r - 123;
+        }
+    }*/
+    //cout << float(image.at<Vec3b>(0,0)[0]) << endl;
+    //cout << float(image.at<Vec3b>(0,0)[0]) - 104 << endl;
+    // 3 -> 6
+    uchar* test = image1.data;
+    cout << float(test[0]) << ' ' << float(test[1]) << ' ' << float(test[2])<< ' ' << float(test[3])<< ' ' << float(test[4])<< endl;
+
+    float* data = new float [583680];
+    memset((void*)data, 0, 583680*4);
+    for (int c = 0; c < 6; c++)
+    {
+        for (int h = 0; h < 160; h++)
+        {
+            for (int w = 0; w < 608; w++)
+            {
+                if (c == 0)
+                data[c*160*608 + h*608 + w] = float(image2.at<Vec3b>(h, w)[0]) - 104;
+                if (c == 1)
+                data[c*160*608 + h*608 + w] = float(image2.at<Vec3b>(h, w)[1]) - 117;
+                if (c == 2)
+                data[c*160*608 + h*608 + w] = float(image2.at<Vec3b>(h, w)[2]) - 123;
+                if (c == 3)
+                data[c*160*608 + h*608 + w] = float(image1.at<Vec3b>(h, w)[0]) - 104;
+                if (c == 4)
+                data[c*160*608 + h*608 + w] = float(image1.at<Vec3b>(h, w)[1]) - 117;
+                if (c == 5)
+                data[c*160*608 + h*608 + w] = float(image1.at<Vec3b>(h, w)[2]) - 123;
+            }
+        }
+    }
+    cout << data[0] << ' ' << data[97280] << ' ' << data[194560] << endl;
+    //cout << data[160*608] << ' ' << data[160*608+1] << endl;
+    //cout << data[608] << ' ' << data[609] << endl;
+	dpuSetInputTensorInCHWFP32(task, INPUT_NODE, data, 583680);
+	dpuRunTask(task);
+    ROS_INFO("1");
+	int num = dpuGetOutputTensorSize(task, OUTPUT_NODE);
+    float* result = new float[num];
+    dpuGetOutputTensorInCHWFP32(task, OUTPUT_NODE, result, num);
+    // out_file(task);
+    dpuDestroyTask(task);
+    dpuDestroyKernel(kernel);
+    ROS_INFO("2");
+    // Dettach from DPU driver & release resources
+    return result;
+}
 
 class dpu_VO{
 public:
@@ -120,7 +224,7 @@ void dpu_VO::callbackThread(void* __this)
                 ros::Time start = ros::Time::now();
                 // doing computation
                 // usleep(3*1000);
-                dpuVO(pre_frame, now_frame);
+                float* DPU_result = dpuVO(pre_frame, now_frame);
                 // finishing time
                 ROS_INFO_STREAM("previous image ID: " << pre_ID);
                 ROS_INFO_STREAM("image ID: " << _this->frame_queue.front()->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
@@ -134,25 +238,8 @@ void dpu_VO::callbackThread(void* __this)
                 std::stringstream ss;
                 ss << _this->frame_queue.front()->ID;
                 dat.ID = ss.str();
-                dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-                dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-                dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-                dat.layout.dim[0].label = "height";
-                dat.layout.dim[1].label = "width";
-                dat.layout.dim[2].label = "channal";
-                dat.layout.dim[0].size = rH;
-                dat.layout.dim[1].size = rW;
-                dat.layout.dim[2].size = rC;
-                dat.layout.dim[0].stride = rH*rW*rC;
-                dat.layout.dim[1].stride = rW*rC;
-                dat.layout.dim[2].stride = rC;
-                dat.layout.data_offset = 0;
-                std::vector<float> vec2(rW*rH*rC, 0);
-                for (int i=0; i<rH; i++)
-                    for (int j=0; j<rW; j++)
-                        for (int z=0; z<rC; z++)
-                            vec2[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
-                dat.data = vec2;
+                std::vector<float> vec(DPU_result, DPU_result + rH*rW*rC);
+                dat.data = vec;
                 dpu_vo_pub.publish(dat);
                 ros::spinOnce();
                 // change pre_frame

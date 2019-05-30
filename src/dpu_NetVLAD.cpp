@@ -17,12 +17,52 @@
 #include <vector>
 #include <array>
 
+#include <image_transport/image_transport.h>  
+#include <opencv2/highgui/highgui.hpp>  
+#include <opencv2/imgproc/imgproc.hpp>  
+#include <cv_bridge/cv_bridge.h> 
+
+#include <dnndk/dnndk.h>
+
 #define H (240)
 #define W (640)
 #define C (3)
-#define rH (14)
-#define rW (14)
+#define rH (24)
+#define rW (24)
 #define rC (512)
+#define INPUT_NODE "ConvNdBackward1"
+#define OUTPUT_NODE "ConvNdBackward29"
+#define length 4096
+
+using namespace std;
+//using namespace std::chrono;
+using namespace cv;
+
+float* dpuNetVLAD(Mat image){
+    DPUKernel *kernel = dpuLoadKernel("netvlad");
+    assert(kernel);
+    DPUTask *task = dpuCreateTask(kernel, 0);
+    resize(image, image, Size(384,384), (0, 0), (0, 0), INTER_LINEAR);
+    float mean[3] = {0, 0, 0};
+    dpuSetInputImage(task, INPUT_NODE, image, mean);
+    cout << "\nRun netvlad ..." << endl;
+	dpuRunTask(task);
+    long long timeProf = dpuGetTaskProfile(task);
+    cout << "  DPU CONV Execution time: " << (timeProf * 1.0f) << "us\n";
+
+    int num = dpuGetOutputTensorSize(task, OUTPUT_NODE);
+    float *f_result = new float[294912];
+    int8_t *result = new int8_t[num];
+    dpuGetOutputTensorInCHWInt8(task, OUTPUT_NODE, result, num);
+    for (int i = 0; i < num; i++)
+    {
+        f_result[i] = (+result[i]) * 2;
+    }
+    dpuDestroyTask(task);
+    dpuDestroyKernel(kernel);
+    delete[] result;
+    return f_result;
+} 
 
 
 class dpu_NetVLAD{
@@ -98,11 +138,12 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
             ROS_INFO("DPU NetVLAD heard: [%s]", msg->ID.c_str());
             // Debug
             // ROS_INFO("############# %d ##################", msg->data.at(10));
-
+            cv::Mat frame = cv_bridge::toCvCopy(msg->frame, "bgr8")->image;
             // starting time
             ros::Time start = ros::Time::now();
             // doing computation
-            usleep(66*1000);
+            // usleep(66*1000);
+            float* DPU_result = dpuNetVLAD(frame);
             // finishing time
             ROS_INFO_STREAM("image ID: " << msg->ID << "; starting time: " << start << "; finishing time: " << ros::Time::now());
             
@@ -112,24 +153,7 @@ void dpu_NetVLAD::callbackThread(const vonetvlad::my_image::ConstPtr& msg)
             std::stringstream ss;
             ss << msg->ID;
             dat.ID = ss.str();
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim.push_back(std_msgs::MultiArrayDimension());
-            dat.layout.dim[0].label = "height";
-            dat.layout.dim[1].label = "width";
-            dat.layout.dim[2].label = "channal";
-            dat.layout.dim[0].size = rH;
-            dat.layout.dim[1].size = rW;
-            dat.layout.dim[2].size = rC;
-            dat.layout.dim[0].stride = rH*rW*rC;
-            dat.layout.dim[1].stride = rW*rC;
-            dat.layout.dim[2].stride = rC;
-            dat.layout.data_offset = 0;
-            std::vector<float> vec(rW*rH*rC, 0);
-            for (int i=0; i<rH; i++)
-                for (int j=0; j<rW; j++)
-                    for (int z=0; z<rC; z++)
-                        vec[i*rW*rC + j*rC + z] = rand() % 10 + 1 ;
+            std::vector<float> vec(DPU_result, DPU_result + rH*rW*rC);
             dat.data = vec;
             /*std::stringstream ss;
             std_msgs::String msg_pub;
@@ -150,6 +174,8 @@ int main(int argc, char **argv)
 {
     // ROS节点初始化
     ros::init(argc, argv, "dpu_NetVLAD");
+    // 开启DPU
+    dpuOpen();
     dpu_NetVLAD dpu_NetVLAD_inst;
     ros::Rate loop_rate(50);
     
@@ -157,5 +183,6 @@ int main(int argc, char **argv)
         ros::spinOnce();
         loop_rate.sleep();
     }
+    dpuClose();
     return 0;
 }
